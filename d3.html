@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+
+.d3-tip {
+  line-height: 1;
+  font-weight: bold;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 2px;
+}
+
+.axis path {
+  display: none;
+}
+
+.bar:hover {
+  fill: red ;
+}
+
+/* Creates a small triangle extender for the tooltip */
+.d3-tip:after {
+  box-sizing: border-box;
+  display: inline;
+  font-size: 10px;
+  width: 100%;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.8);
+  content: "\25BC";
+  position: absolute;
+  text-align: center;
+}
+
+/* Style northward tooltips differently */
+.d3-tip.n:after {
+  margin: -1px 0 0 0;
+  top: 100%;
+  left: 0;
+}
+
+
+</style>
+<svg width="960" height="1000" class = 'top'></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="./tip/index.js"></script>
+<script>
+
+
+var tip = d3.tip()
+  .attr('class', 'd3-tip')
+  .offset([-10, 0])
+  .html(function(d) {
+    return "<strong>Time:</strong> <span style='color:red'>" + (d[1] - d[0]) + " minutes </span>";
+  })
+
+
+var svg = d3.select(".top"),
+    margin = {top: 20, right: 20, bottom: 30, left: 40},
+    width = +svg.attr("width") - margin.left - margin.right,
+    height = +svg.attr("height") - margin.top - margin.bottom,
+    g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    svg.call(tip);
+
+var x = d3.scaleBand()
+    .rangeRound([0, width])
+    .padding(0.1)
+    .align(0.1);
+
+var y = d3.scaleLinear()
+    .rangeRound([height/2, 0]);
+
+var y2 = d3.scaleLinear()
+    .rangeRound([height/2, height]);
+
+var z = d3.scaleOrdinal()
+    .range(["#B933AD", "#FCCC0A", "#00933C"]);
+
+var stack = d3.stack();
+
+var data2 = d3.csv("/data2.csv", type, function(error, data) {return data});
+
+
+d3.csv("/data.csv", type, function(error, data) {
+  if (error) throw error;
+
+
+  x.domain(data.map(function(d) { return d.Date; }));
+  y.domain([0, d3.max(data, function(d) { return d.total/1.3; })]).nice();
+  y2.domain([0, d3.max(data, function(d) { return d.total/1.3; })]).nice();
+  z.domain(data.columns.slice(1));
+
+  g.selectAll(".serie")
+    .data(stack.keys(data.columns.slice(1,4))(data))
+    .enter().append("g")
+      .attr("class", "serie")
+      .attr("fill", function(d) { return z(d.key); })
+    .selectAll("rect")
+    .data(function(d) { return d; })
+    .enter().append("rect")
+      .attr("x", function(d) { return x(d.data.Date); })
+      .attr("y", function(d) { return y(d[1]); })
+      .attr("class", "bar")
+      .attr("height", function(d) { return y(d[0]) - y(d[1]); })
+      .attr("width", x.bandwidth())
+      .on('mouseover', tip.show)
+      .on('mouseout', tip.hide)
+
+
+  g.selectAll(".serie2")
+    .data(stack.keys(data.columns.slice(4))(data))
+    .enter().append("g")
+      .attr("class", "serie2")
+      .attr("fill", function(d) { return z(d.key); })
+    .selectAll("rect")
+    .data(function(d) { return d;})
+    .enter().append("rect")
+      .attr("x", function(d) { return x(d.data.Date); })
+      .attr("class", "bar")
+      .attr("y", function(d) { return y2(d[0]); })
+      .attr("height", function(d) { return y2(d[1]) - y2(d[0]); })
+      .attr("width", x.bandwidth())
+      .on('mouseover', tip.show)
+      .on('mouseout', tip.hide)
+
+
+
+  g.append("g")
+      .attr("class", "axis axis--x")
+      .attr("transform", "translate(0," + height/2 + ")")
+      .call(d3.axisBottom(x));
+
+  g.append("g")
+      .attr("class", "axis axis--y")
+      .call(d3.axisLeft(y).ticks(10, "s"))
+    .append("text")
+      .attr("x", 2)
+      .attr("y", y(y.ticks(10).pop()))
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "start")
+      .attr("fill", "#000")
+      .text("Commute Time To Work");
+
+      g.append("g")
+      .attr("class", "axis axis--y")
+      .call(d3.axisLeft(y2).ticks(10, "s"))
+    .append("text")
+      .attr("x", 2)
+      .attr("y", y2(y2.ticks(10).pop()))
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "start")
+      .attr("fill", "#000")
+      .text("Commute Time From Work");
+  
+
+
+  var legend = g.selectAll(".legend")
+    .data(data.columns.slice(1,4).reverse())
+    .enter().append("g")
+      .attr("class", "legend")
+      .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; })
+      .style("font", "10px sans-serif");
+
+  legend.append("rect")
+      .attr("x", width - 18)
+      .attr("width", 18)
+      .attr("height", 18)
+      .attr("fill", z);
+
+  legend.append("text")
+      .attr("x", width - 24)
+      .attr("y", 9)
+      .attr("dy", ".35em")
+      .attr("text-anchor", "end")
+      .text(function(d) { return d; });
+});
+
+
+
+function type(d, i, columns) {
+  for (i = 1, t = 0; i < columns.length; ++i) t += d[columns[i]] = +d[columns[i]];
+  d.total = t;
+  return d;
+}
+
+
+</script>
